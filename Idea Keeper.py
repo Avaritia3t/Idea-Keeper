@@ -1,14 +1,18 @@
-#an example in creating an idea container. Will ultimately contain syntax checking, database integration, and data management content
+#an example in creating an idea container.
+#currently contains: Basic input verification, basic database storage utility. Future updates to include query capability, web-scraping, and voice input.
 #demonstration of general coding etiquette practices
+#currently using psycopg(3) and postgresql, with pgadmin4 being used as a dbadmin/verification tool.
 
 from datetime import date, datetime
+from os import name
 import time
+import psycopg
 
 i_o = True
 ideacount = 0
 
 def greet(): #say hello
-    print('Hello. Welcome to Idea Storage Tool v0.01')
+    print('Hello. Welcome to Idea Storage Tool v0.02')
 
 def turnOff(): #global control loop for the program. Useless for now, can input at any time with a while i_o == True loop.
     global i_o
@@ -51,8 +55,29 @@ def getYNInput(): #function for capturing input, verifying if it's a string, and
         return userInput
 
 def getNewIdea():
-    CurrentIdea = idea.getNew() #create a new idea, and store it in the currentIdea slot.
-    #CurrentIdea.relay() #commented out for now. just for verification purposes, we're going to return a brief summary of the current idea. This will be super handy.
+    CurrentIdea = idea.getNew()              
+    #create a new idea, and store it in the currentIdea slot.
+    ideaID = CurrentIdea.id
+    ideaName = CurrentIdea.name
+    ideaSummary = CurrentIdea.summary
+    ideaTime = CurrentIdea.spawnTime
+
+    varSQL = 'INSERT INTO ideastorage (given_idea_id, idea_designation, idea_summary, idea_creation_time) VALUES (%s, %s, %s, %s)'
+    SQLcolumns = (ideaID, ideaName, ideaSummary, ideaTime)
+    with psycopg.connect('dbname=ideatest user=postgres password=password') as conn: #connect to database, store relevant idea information.
+        with conn.cursor() as cur:
+            cur.execute(varSQL, SQLcolumns)
+
+def retrieveIdeas():
+    with psycopg.connect('dbname=ideatest user=postgres password=password') as conn: #connect to database, store relevant idea information.
+        with conn.cursor() as cur:
+            cur.execute('''
+                SELECT idea_designation, idea_summary, idea_creation_time
+                FROM ideastorage
+                ORDER BY idea_designation'''
+            )
+            storedIdeas = cur.fetchall()
+            return storedIdeas
 
 def DoIContinue(): #universal test for program continuity status. 
     decision = getYNInput()
@@ -60,7 +85,6 @@ def DoIContinue(): #universal test for program continuity status.
         return True
     if decision == 'n':
         return False
-
 
 class sessiontime: #going to need to keep track of session time and eventually analyze it for properties, clues about usage history, etc. Keep track of logon times and append to list.
                    #but for now, these functions are pretty much just for show. 
@@ -72,7 +96,7 @@ class sessiontime: #going to need to keep track of session time and eventually a
         StartTimeString = StartTime.strftime('%m/%d/%y %H:%M:%S\n')
         print('Script started at: ', StartTimeString)
 
-        with open(r'C:\dir.txt', 'w') as TimeWriter:
+        with open(r'C:\Users\mathew.roberts\Desktop\Test Python Code\ScriptRunTime.txt', 'w') as TimeWriter:
             TimeWriter.writelines(StartTimeString)
     
     def GetCloseTime(): #sessiontime.GetCloseTime() will get current time, and save to file as well. 
@@ -80,16 +104,17 @@ class sessiontime: #going to need to keep track of session time and eventually a
         CloseTimeString = CloseTime.strftime('%m/%d/%y %H:%M:%S\n')
         print('Script terminated at: ', CloseTimeString)
 
-        with open(r'C:\dir', 'a') as TimeWriter:
+        with open(r'C:\Users\mathew.roberts\Desktop\Test Python Code\ScriptRunTime.txt', 'a') as TimeWriter:
             TimeWriter.writelines(CloseTimeString)
 
 class idea: #this will serve as the heart of the program for storing, retrieving, and prioritizing ideas. 
     '''container for any random idea'''
 
-    def __init__(self, id, name, summary, shouldDo, shouldNotDo): #these parameters specify the default attributes "idea" will be created with
+    def __init__(self, id, name, summary, spawnTime, shouldDo, shouldNotDo): #these parameters specify the default attributes "idea" will be created with
         self.id = id #such as an idea id [1, 2 3,... ]
         self.name = name #such as a name [super lazer gun of death, Code004, my_s3cr3t_1d]
         self.summary = summary #a brief description of the idea
+        self.spawnTime = spawnTime #when the idea was created
         self.shouldDo = shouldDo #if the program should be acting on this idea
         self.shouldNotDo = shouldNotDo #if the program should deprioritize this idea. 
     
@@ -97,6 +122,7 @@ class idea: #this will serve as the heart of the program for storing, retrieving
         print("\nThis idea is designated:", self.id)
         print("Project name:", self.name)
         print("Project summary:", self.summary)
+        print("")
 
         if(self.shouldDo == True):
             print("This project is a priority.\n")
@@ -111,6 +137,7 @@ class idea: #this will serve as the heart of the program for storing, retrieving
             id = getNumInput(), #storing a custom idea ID. Will ultimately turn this to a conditional
             name = input('Project name: '), #alternately referrable to as a project name
             summary = input('Project summary: '), #general project summary.
+            spawnTime = datetime.now().strftime('%m/%d/%y %H:%M:%S'), #when the idea was created.
             shouldDo = True, #a global 'thought' variable, guiding the architecture. If an action that should be done exists, that allows binary prioritization of tasks.
             shouldNotDo = False #same as above. 
         )
@@ -121,10 +148,6 @@ class idea: #this will serve as the heart of the program for storing, retrieving
     # here, I'll need to create a global variable, and be able to assign an 'isAffirmative' or 'isNegative' or 'isNeutral' attribute to the input variable
     # and then assign a value to the attribute based upon analysis. 
     # but for now, we'll have to rely upon good user input
-
-
-
-
 
 
 if __name__ == '__main__': #start the program here
@@ -150,8 +173,11 @@ if __name__ == '__main__': #start the program here
             keep_working = False
     
     time.sleep(2)
+    
+    print('Here are your currently stored ideas: ', retrieveIdeas())
 
-
+    time.sleep(2)
+    
     terminate() #like tears... in rain.... (this is more of a closing message than it is actually 'closing' the program.)
                 #'closing' the program would go here, in the form of an i_o = False trigger, closing an enclosing while i_o = True loop. 
     sessiontime.GetCloseTime() #log program ending time. 
